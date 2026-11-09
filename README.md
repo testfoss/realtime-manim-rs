@@ -272,3 +272,15 @@ Every later performance claim must include:
 6. trace/diff artifact paths.
 
 Do not publish an isolated best-case result as the user-facing number.
+
+## Testfoss demo
+
+The `testfoss-demo` branch adds an isolated package/browser demonstration at upstream pin `f604cb5b9e6fd19660635821c00d5ea641047d8f`; it does not change the upstream examples, scripts, runtime, or lockfiles. See [the demo guide](testfoss/README.md) and [agent/reproduction notes](AGENTS.md).
+
+```sh
+./testfoss/run.sh package
+(cd testfoss && npm ci && npx playwright install chromium)
+LMCODE_HEADED=1 ./testfoss/run.sh browser
+```
+
+The package gate records 35/35 tests. The browser scenario uses `lmwebtest playwright` to check pause, an exact `2.00s` seek, resume, and browser errors against the local package example. Its rendered check needs reliable hardware WebGPU and headful Chrome; headless SwiftShader was unstable in the lab and is not claimed as a supported fallback. The rendered Actions job is therefore manual, while package build/test runs normally. Generated runtime, build dependencies, and screenshots are never demo source.

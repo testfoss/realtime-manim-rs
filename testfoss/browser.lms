@@ -1,0 +1,68 @@
+let base_url = env("TESTFOSS_BASE_URL", "http://127.0.0.1:8107");
+mkdir("artifacts");
+
+program = _lmcode_ cli="lmwebtest playwright";
+let launch_options = "{\"args\":[\"--enable-unsafe-webgpu\",\"--enable-features=Vulkan,UseSkiaRenderer\"]}";
+if (pw.env("TESTFOSS_CHROME_EXECUTABLE") != "") {
+  launch_options = "{\"executablePath\":\"" + pw.env("TESTFOSS_CHROME_EXECUTABLE") + "\",\"args\":[\"--enable-unsafe-webgpu\",\"--enable-features=Vulkan,UseSkiaRenderer\"]}";
+}
+let b = pw.launch("chromium", launch_options);
+let p = b.new_page("{\"viewport\":{\"width\":1280,\"height\":900}}");
+p.set_default_timeout(60000);
+p.goto(pw.env("TESTFOSS_BASE_URL") + "/example/", "{\"waitUntil\":\"networkidle\"}");
+p.wait_for_function("globalThis.__MANIM_PACKAGE_READY__ === true");
+$return.webgpu_adapter = p.evaluate("(async () => !!(navigator.gpu && await navigator.gpu.requestAdapter()))()") == "true";
+$return.canvas_count = p.locator("canvas").count();
+p.wait_for_timeout(500);
+p.click("#toggle");
+p.wait_for_timeout(150);
+let paused_start = p.text_content("#clock");
+p.wait_for_timeout(500);
+$return.paused_start = paused_start;
+$return.paused_end = p.text_content("#clock");
+$return.pause_button = p.text_content("#toggle");
+$return.seek_slider = p.evaluate("(() => { const slider = document.querySelector('#time'); slider.value = '2.00'; slider.dispatchEvent(new Event('input', { bubbles: true })); slider.dispatchEvent(new Event('change', { bubbles: true })); return Number(slider.value); })()");
+p.wait_for_timeout(250);
+$return.seek_time = p.text_content("#clock");
+p.click("#toggle");
+p.wait_for_timeout(450);
+$return.resume_time = p.text_content("#clock");
+$return.resume_button = p.text_content("#toggle");
+p.screenshot("artifacts/manim.png", true);
+$return.page_errors = p.page_errors();
+$return.failed_requests = p.failed_requests();
+b.close();
+end _lmcode_
+
+let res = run_lmcode(program, {command: ["lmwebtest", "playwright", "--lmcode", "$DSLFILE"]});
+let stats = {pass: 0, fail: 0};
+fn check(condition, name, detail) {
+  if (condition) {
+    stats["pass"] = stats.get("pass", 0) + 1;
+    println(f"[PASS] {name}: {detail}");
+  } else {
+    stats["fail"] = stats.get("fail", 0) + 1;
+    println(f"[FAIL] {name}: {detail}");
+  }
+}
+check(res.get("ok", false), "lmwebtest run", "Playwright program completed");
+if (!res.get("ok", false)) {
+  println(json_stringify(res));
+  exit(1);
+}
+let r = res.get("result", {});
+check(r.get("webgpu_adapter", false), "WebGPU adapter", "available");
+check(r.get("canvas_count", 0) == 1, "local package scene", "one canvas");
+check(r.get("paused_start", "") != "", "pause initial clock", r.get("paused_start", ""));
+check(r.get("paused_end", "") == r.get("paused_start", "missing"), "pause stable", r.get("paused_end", ""));
+check(r.get("pause_button", "") == "Play", "pause control", r.get("pause_button", ""));
+check(num(r.get("seek_slider", "0")) == 2, "seek slider", r.get("seek_slider", "0"));
+check(r.get("seek_time", "") == "2.00s", "exact seek", r.get("seek_time", ""));
+check(num(replace(r.get("resume_time", "0"), "s", "")) > 2.05, "resume", r.get("resume_time", ""));
+check(r.get("resume_button", "") == "Pause", "resume control", r.get("resume_button", ""));
+check(len(json_parse(r.get("page_errors", "[]"))) == 0, "page errors", r.get("page_errors", "[]"));
+check(len(json_parse(r.get("failed_requests", "[]"))) == 0, "failed requests", r.get("failed_requests", "[]"));
+println(f"Manim browser integration: {stats.get('pass', 0)} passed, {stats.get('fail', 0)} failed");
+if (stats.get("fail", 0) > 0) {
+  exit(1);
+}

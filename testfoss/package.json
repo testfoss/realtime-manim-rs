@@ -1,0 +1,15 @@
+{
+  "name": "testfoss-realtime-manim-demo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "browsers:install": "playwright install chromium",
+    "check": "lmscript -e 'load_schema(cli=\"lmwebtest playwright\");' && lmscript --check browser.lms",
+    "test:browser": "lmscript browser.lms"
+  },
+  "devDependencies": {
+    "@lmctl-ai/lmctl": "0.2.463",
+    "@playwright/test": "1.62.1",
+    "lmwebtest": "https://codeload.github.com/lmctl-ai/lmwebtest/tar.gz/2920befd355eacc654697820d690db074e94dce3"
+  }
+}
